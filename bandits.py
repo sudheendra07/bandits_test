@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from operator import add
-# import random
 
 def play_random(arms):
+    # randomly sample arm with epsilon probability
     idx = np.random.randint(len(arms.mean))
     reward = np.random.uniform(arms.mean[idx]-arms.half[idx], arms.mean[idx]+arms.half[idx])
     arms.count_pulls[idx] += 1
@@ -11,27 +11,26 @@ def play_random(arms):
     return reward
 
 def play_greedy(arms):
+    # choose greedy arm with (1-epsilon) probability
     idx = np.argmax(arms.mean_est)
     reward = np.random.uniform(arms.mean[idx]-arms.half[idx], arms.mean[idx]+arms.half[idx])
     arms.count_pulls[idx] += 1
     arms.mean_est[idx] += (1/arms.count_pulls[idx]) * (reward - arms.mean_est[idx])
     return reward
 
-def play_ucb(arms, t):
-    c = 2
+def play_ucb(arms, t, c):
+    # play arms in round robin initially, then apply UCB to choose arm
     if t < arms.no_arms:
         idx = t
     else:
-        conf_int = [(c * np.sqrt(np.log(t)/n_t)) for n_t in arms.count_pulls]
+        conf_int = [(c * np.sqrt(np.log(t+1)/n_t)) for n_t in arms.count_pulls]
         arms.ucb_est = list(map(add, arms.mean_est, conf_int))
         idx = np.argmax(arms.ucb_est)
     
     reward = np.random.uniform(arms.mean[idx]-arms.half[idx], arms.mean[idx]+arms.half[idx])
-    try:
-        arms.count_pulls[idx] += 1
-        arms.mean_est[idx] += (1/arms.count_pulls[idx]) * (reward - arms.mean_est[idx])
-    except:
-        print(idx)
+    
+    arms.count_pulls[idx] += 1
+    arms.mean_est[idx] += (1/arms.count_pulls[idx]) * (reward - arms.mean_est[idx])
     
     return reward
 
@@ -48,15 +47,19 @@ class arms_unif:
         self.count_pulls = [0]*self.no_arms
         self.mean_est = [0]*self.no_arms
 
-arms_mean = [-0.3, 0, 0.2, 0.3]
-arms_unif_half = [1, 1, 1, 1]
+# modelling the arms as uniform dist with given mean and half-lengths
+arms_mean = [-0.2, 0, 0.2, 0.4]
+arms_unif_half = [0.5]*len(arms_mean)
 num_arms = len(arms_mean)
+
+# epsilon-greedy parameter
 epsilon = 0.1
 
-horizon_length = 1000
+horizon_length = 10000
 avg_reward = np.zeros(horizon_length+1)
 avg_reward_ucb = np.zeros(horizon_length+1)
 
+# initialize arms class
 arms = arms_unif(mean=arms_mean, half=arms_unif_half)
 
 for i in range(horizon_length):
@@ -68,14 +71,18 @@ for i in range(horizon_length):
 
     avg_reward[i+1] = avg_reward[i] + (1/(i+1)) * (reward - avg_reward[i])
 
+# reset arms mean estimation and pull count from E-G
 arms.reset()
 
+# UCB parameter
+c = 1
+
 for i in range(horizon_length):
-    reward = play_ucb(arms, i+1)
+    reward = play_ucb(arms, i, c)
     avg_reward_ucb[i+1] = avg_reward_ucb[i] + (1/(i+1)) * (reward - avg_reward_ucb[i])
 
 plt.plot(avg_reward, 'g', label = f'E-G (eps = {epsilon})')
-plt.plot(avg_reward_ucb, 'r', label = f'UCB (c = 2)')
+plt.plot(avg_reward_ucb, 'r', label = f'UCB (c = {c})')
 plt.title('Epsilon-Greedy v/s UCB Bandit Algorithm')
 plt.xlabel('Steps')
 plt.ylabel('Average Cumulative Reward')
