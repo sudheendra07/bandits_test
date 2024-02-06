@@ -55,8 +55,9 @@ num_arms = len(arms_mean)
 # epsilon-greedy parameter
 epsilon = 0.1
 
-horizon_length = 10000
+horizon_length = 2000
 avg_reward = np.zeros(horizon_length+1)
+avg_reward_optimistic = np.zeros(horizon_length+1)
 avg_reward_ucb = np.zeros(horizon_length+1)
 
 # initialize arms class
@@ -73,6 +74,20 @@ for i in range(horizon_length):
 
 # reset arms mean estimation and pull count from E-G
 arms.reset()
+init_opt_est = 1
+arms.mean_est = [init_opt_est]*arms.no_arms
+
+for i in range(horizon_length):
+    chance = np.random.uniform(0, 1)
+    if chance < epsilon:
+        reward = play_random(arms)
+    else:
+        reward = play_greedy(arms)
+
+    avg_reward_optimistic[i+1] = avg_reward_optimistic[i] + (1/(i+1)) * (reward - avg_reward_optimistic[i])
+
+# reset arms mean estimation and pull count from optimistic E-G
+arms.reset()
 
 # UCB parameter
 c = 1
@@ -82,6 +97,7 @@ for i in range(horizon_length):
     avg_reward_ucb[i+1] = avg_reward_ucb[i] + (1/(i+1)) * (reward - avg_reward_ucb[i])
 
 plt.plot(avg_reward, 'g', label = f'E-G (eps = {epsilon})')
+plt.plot(avg_reward_optimistic, 'b', label = f'E-G Opt (M0 = {init_opt_est})')
 plt.plot(avg_reward_ucb, 'r', label = f'UCB (c = {c})')
 plt.title('Epsilon-Greedy v/s UCB Bandit Algorithm')
 plt.xlabel('Steps')
